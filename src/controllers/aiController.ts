@@ -1,0 +1,77 @@
+// import { Request, Response } from "express";
+// // এখানে আপনি সরাসরি Gemini বা OpenAI এর SDK ব্যবহার করতে পারেন
+// // আপাতত আমি একটি সিম্পল প্রম্পট প্রসেসিং লজিক দেখাচ্ছি
+
+// export const generateContent = async (req: Request, res: Response) => {
+//   const { prompt } = req.body;
+
+//   if (!prompt) {
+//     return res.status(400).json({ message: "Prompt is required" });
+//   }
+
+//   try {
+//     // এখানে আপনার AI Logic থাকবে (e.g., Gemini API call)
+//     // উদাহরণস্বরূপ একটি ডামি রেসপন্স:
+//     const aiResponse = `Lumina AI Analysis for: "${prompt}" \n\nThis is a premium AI generated response showing the power of your MERN stack application.`;
+
+//     res.status(200).json({ result: aiResponse });
+//   } catch (error) {
+//     res.status(500).json({ message: "AI Generation failed" });
+//   }
+// };
+
+//!
+import { Request, Response } from "express";
+import axios from "axios";
+
+export const generateContent = async (req: Request, res: Response) => {
+  try {
+    const { prompt } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res
+        .status(500)
+        .json({ message: "API Key logic failed. Check your .env file." });
+    }
+
+    // ১. আপনার লিস্ট অনুযায়ী মডেলের নাম 'gemini-2.5-flash' ব্যবহার করছি
+    // ২. এন্ডপয়েন্ট হিসেবে 'v1beta' ব্যবহার করছি যা আপনার লিস্টের সাথে ম্যাচ করে
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+    const response = await axios.post(
+      url,
+      {
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    // ৩. রেসপন্স ডাটা থেকে টেক্সট বের করা
+    const aiResponse = response.data.candidates[0].content.parts[0].text;
+
+    return res.status(200).json({
+      success: true,
+      result: aiResponse,
+    });
+  } catch (error: any) {
+    console.error(
+      "Lumina AI Hub Error:",
+      error.response?.data || error.message,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Lumina AI could not process the request.",
+      error: error.response?.data?.error?.message || error.message,
+    });
+  }
+};
