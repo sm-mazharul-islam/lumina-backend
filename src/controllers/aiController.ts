@@ -1,25 +1,3 @@
-// import { Request, Response } from "express";
-// // এখানে আপনি সরাসরি Gemini বা OpenAI এর SDK ব্যবহার করতে পারেন
-// // আপাতত আমি একটি সিম্পল প্রম্পট প্রসেসিং লজিক দেখাচ্ছি
-
-// export const generateContent = async (req: Request, res: Response) => {
-//   const { prompt } = req.body;
-
-//   if (!prompt) {
-//     return res.status(400).json({ message: "Prompt is required" });
-//   }
-
-//   try {
-//     // এখানে আপনার AI Logic থাকবে (e.g., Gemini API call)
-//     // উদাহরণস্বরূপ একটি ডামি রেসপন্স:
-//     const aiResponse = `Lumina AI Analysis for: "${prompt}" \n\nThis is a premium AI generated response showing the power of your MERN stack application.`;
-
-//     res.status(200).json({ result: aiResponse });
-//   } catch (error) {
-//     res.status(500).json({ message: "AI Generation failed" });
-//   }
-// };
-
 //!
 import { Request, Response } from "express";
 import axios from "axios";
