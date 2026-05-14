@@ -1,11 +1,11 @@
 import dotenv from "dotenv";
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { connectDB } from "./config/db";
 import authRoutes from "./routes/authRoutes";
 import aiRoutes from "./routes/aiRoutes";
 
-// ১. এনভায়রনমেন্ট ভেরিয়েবল লোড করা (সবার আগে)
+// ১. এনভায়রনমেন্ট ভেরিয়েবল লোড করা
 dotenv.config();
 
 // ২. ডাটাবেস কানেকশন
@@ -14,35 +14,59 @@ connectDB();
 const app = express();
 
 /**
- * ৩. CORS কনফিগারেশন (লাইভ প্রোডাকশনের জন্য আপডেট করা)
- * এটি আপনার ভারসেল ফ্রন্টএন্ড এবং লোকালহোস্ট উভয়কেই অনুমতি দিবে।
+ * ৩. CORS কনফিগারেশন
  */
-app.use(
-  cors({
-    origin: [
-      "https://lumina-ai-ten-virid.vercel.app", // আপনার ফ্রন্টএন্ড লিংক
-      "http://localhost:3000", // লোকাল ডেভেলপমেন্ট
-    ],
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
-);
+const allowedOrigins = [
+  "https://lumina-ai-ten-virid.vercel.app",
+  "http://localhost:3000",
+];
 
-// ৪. প্রি-ফ্লাইট (OPTIONS) রিকোয়েস্ট হ্যান্ডেল করা (CORS Error ফিক্স করার জন্য জরুরি)
-app.options("*", cors());
+const corsOptions = {
+  origin: (origin: any, callback: any) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
-// ৫. মিডলওয়্যার
-app.use(express.json());
+app.use(cors(corsOptions));
 
 /**
- * ৬. রুট রাউট (Health Check)
- * এটি দিয়ে চেক করা যায় ব্যাকএন্ড লাইভ আছে কি না।
+ * ৪. প্রি-ফ্লাইট (OPTIONS) রিকোয়েস্ট হ্যান্ডেল করা
+ * রেজেক্স এরর এড়াতে আমরা সরাসরি মিডলওয়্যার ব্যবহার করছি।
+ * এটি সব পাথের জন্য OPTIONS রিকোয়েস্ট এক্সেপ্ট করবে।
+ */
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method === "OPTIONS") {
+    res.header("Access-Control-Allow-Origin", req.headers.origin);
+    res.header(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+    );
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.header("Access-Control-Allow-Credentials", "true");
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+// ৫. মিডলওয়্যার
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+/**
+ * ৬. হেলথ চেক রাউট
  */
 app.get("/", (req: Request, res: Response) => {
   res.status(200).json({
     success: true,
-    message: "Lumina AI Backend is Running Smoothly!",
+    message: "Lumina AI Backend is soaring on Vercel!",
+    env_status: process.env.GEMINI_API_KEY ? "Keys Loaded" : "Keys Missing",
     timestamp: new Date().toISOString(),
   });
 });
@@ -52,22 +76,34 @@ app.use("/api/auth", authRoutes);
 app.use("/api/ai", aiRoutes);
 
 /**
- * ৮. গ্লোবাল এরর হ্যান্ডলার (সার্ভার ক্র্যাশ হওয়া থেকে বাঁচাবে)
+ * ৮. হ্যান্ডেল ৪-০-৪ (Unknown Routes)
  */
-app.use((err: any, req: Request, res: Response, next: any) => {
-  console.error("Internal Server Error:", err.stack);
-  res.status(500).json({
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
     success: false,
-    message: "Something went wrong on the server!",
-    error: process.env.NODE_ENV === "production" ? null : err.message,
+    message: "Requested endpoint not found on Lumina Server.",
   });
 });
 
-// ৯. পোর্ট কনফিগারেশন
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`🚀 Lumina Server is soaring on port ${PORT}`);
+/**
+ * ৯. গ্লোবাল এরর হ্যান্ডলার
+ */
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error("Internal Server Error:", err.message);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Something went wrong on the server!",
+    error: process.env.NODE_ENV === "production" ? null : err.stack,
+  });
 });
 
-export default app; // Vercel বা অন্য হোস্টিংয়ের জন্য এক্সপোর্ট রাখা ভালো
+// ১০. পোর্ট কনফিগারেশন (লোকাল রান করার জন্য)
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Local Server running on port ${PORT}`);
+  });
+}
+
+// ১১. Vercel এর জন্য এক্সপোর্ট
+export default app;
