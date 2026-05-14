@@ -8,7 +8,14 @@ dotenv.config();
 connectDB(); // Mandatory MongoDB connection
 
 const app = express();
-app.use(cors());
+// Middleware
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  }),
+);
 app.use(express.json());
 
 // Root Route for verification
